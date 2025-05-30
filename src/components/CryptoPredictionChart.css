@@ -1,0 +1,180 @@
+.chart-container {
+    padding: 2rem;
+    background-color: #111827;
+    border-radius: 1rem;
+    color: #f3f4f6;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+  }
+  
+  .chart-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 2rem;
+    flex-wrap: wrap;
+    gap: 1rem;
+  }
+  
+  .crypto-info {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+  
+  .current-time {
+    color: #9ca3af;
+    font-family: monospace;
+    font-size: 0.9rem;
+  }
+  
+  .crypto-selector {
+    display: flex;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+  }
+  
+  .crypto-button {
+    padding: 0.5rem 1rem;
+    border-radius: 0.5rem;
+    border: none;
+    background-color: transparent;
+    color: #f3f4f6;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    outline: 1px solid #374151;
+  }
+  
+  .crypto-button.active {
+    background-color: #22c55e;
+    color: #111827;
+    outline: none;
+  }
+  
+  .crypto-button:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  }
+  
+  .price-cards {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 1rem;
+    margin-bottom: 1.5rem;
+  }
+  
+  .price-card {
+    padding: 1.5rem;
+    background-color: #1f2937;
+    border-radius: 0.5rem;
+    transition: transform 0.2s ease;
+  }
+  
+  .price-card:hover {
+    transform: translateY(-2px);
+  }
+  
+  .price-value {
+    font-size: 1.5rem;
+    margin: 0.5rem 0;
+    font-weight: bold;
+  }
+  
+  .trend-value {
+    font-size: 1.5rem;
+    margin: 0.5rem 0;
+    font-weight: bold;
+    transition: color 0.3s ease;
+  }
+  
+  .trend-value.positive {
+    color: #22c55e;
+  }
+  
+  .trend-value.negative {
+    color: #ef4444;
+  }
+  
+  .zoom-button {
+    padding: 0.5rem 1rem;
+    border-radius: 0.4rem;
+    border: none;
+    background-color: #3b82f6;
+    color: white;
+    cursor: pointer;
+    transition: all 0.2s ease;
+  }
+  
+  .zoom-button:disabled {
+    background-color: #6b7280;
+    cursor: not-allowed;
+  }
+  
+  .zoom-button:not(:disabled):hover {
+    background-color: #2563eb;
+  }
+  
+  .chart-wrapper {
+    position: relative;
+    width: 100%;
+    background-color: #1f2937;
+    border-radius: 0.5rem;
+    padding: 1rem;
+    cursor: crosshair;
+  }
+  
+  .chart-wrapper::before {
+    content: "Click and drag to zoom";
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    font-size: 0.8rem;
+    color: #9ca3af;
+    background-color: rgba(17, 24, 39, 0.8);
+    padding: 4px 8px;
+    border-radius: 4px;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.2s;
+  }
+  
+  .chart-wrapper:hover::before {
+    opacity: 1;
+  }
+  
+  .loading-container {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-height: 400px;
+  }
+  
+  .loader {
+    border: 4px solid #f3f4f6;
+    border-top: 4px solid #22c55e;
+    border-radius: 50%;
+    width: 40px;
+    height: 40px;
+    animation: spin 1s linear infinite;
+    margin-bottom: 1rem;
+  }
+  
+  @keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+  }
+  
+  @media (max-width: 768px) {
+    .chart-container {
+      padding: 1rem;
+    }
+  
+    .chart-header {
+      flex-direction: column;
+      align-items: flex-start;
+    }
+  
+    .price-cards {
+      grid-template-columns: 1fr;
+    }
+  }

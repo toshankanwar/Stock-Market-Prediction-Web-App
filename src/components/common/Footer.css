@@ -1,0 +1,108 @@
+.footer {
+    background-color: #1a2234;
+    color: #f3f4f6;
+    padding: 3rem 2rem 1rem;
+    margin-top: 0rem;
+  }
+  
+  .footer-content {
+    max-width: 1200px;
+    margin: 0 auto;
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    gap: 2rem;
+    margin-bottom: 2rem;
+  }
+  
+  .footer-section h3 {
+    font-size: 1.5rem;
+    margin-bottom: 1rem;
+  }
+  
+  .footer-section h4 {
+    color: #22c55e;
+    margin-bottom: 1rem;
+    font-size: 1.1rem;
+  }
+  
+  .footer-section p {
+    color: #9ca3af;
+    line-height: 1.6;
+  }
+  
+  .footer-links {
+    display: flex;
+    flex-direction: column;
+    gap: 0.8rem;
+  }
+  
+  .footer-links a {
+    color: #f3f4f6;
+    text-decoration: none;
+    transition: color 0.3s ease;
+  }
+  
+  .social-links {
+    display: flex;
+    gap: 1rem;
+    flex-wrap: wrap;
+  }
+  
+  .social-links a {
+    color: #f3f4f6;
+    text-decoration: none;
+    padding: 0.5rem 1rem;
+    border-radius: 4px;
+    background: rgba(34, 197, 94, 0.1);
+    transition: all 0.3s ease;
+  }
+  
+  .footer-bottom {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding-top: 2rem;
+    border-top: 1px solid #2d3748;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 1rem;
+  }
+  
+  .creator-link {
+    color: #f3f4f6;
+    text-decoration: none;
+    position: relative;
+    padding: 0.2rem 0;
+  }
+  
+  .creator-link::after {
+    content: '';
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    width: 0;
+    height: 2px;
+    background: linear-gradient(45deg, #22c55e, #ef4444);
+    transition: width 0.3s ease;
+  }
+  
+  .creator-link:hover::after {
+    width: 100%;
+  }
+  
+  @media (max-width: 768px) {
+    .footer-content {
+      grid-template-columns: 1fr;
+      text-align: center;
+    }
+  
+    .footer-links, .social-links {
+      justify-content: center;
+    }
+  
+    .footer-bottom {
+      flex-direction: column;
+      text-align: center;
+    }
+  }/* Add these styles to your Footer.css */
