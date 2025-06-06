@@ -1,53 +1,37 @@
-import React, { useState, useEffect, useMemo, useRef, useCallback } from "react";
+import React, { useState, useEffect, useRef, useCallback } from "react";
 import {
   LineChart, Line, XAxis, YAxis, Tooltip, CartesianGrid,
-  Legend, ResponsiveContainer, ReferenceArea, Label
+  Legend, ResponsiveContainer
 } from "recharts";
 import { motion, AnimatePresence } from "framer-motion";
-import { SUPPORTED_CRYPTOS, fetchPrediction, fetchLivePrice } from "../api/cryptoService";
 import "./CryptoPredictionChart.css";
-import { format, parseISO } from 'date-fns';
+import { format, setMinutes, setSeconds, addMinutes, subHours } from 'date-fns';
 
-const TIME_FORMAT = 'HH:mm:ss';
+const TIME_FORMAT = 'HH:mm';
 const DATE_TIME_FORMAT = 'yyyy-MM-dd HH:mm:ss';
+const PRICE_UPDATE_INTERVAL = 60 * 1000; // 1 minute in milliseconds
+const PRICE_RANGE_INTERVAL = 1000; // $1,000 intervals
+const PRICE_RANGE_PADDING = 5000; // $5,000 padding above and below
+const HOURS_TO_SHOW = 4; // Past hours to show
+const MINUTES_TO_PREDICT = 30; // Future minutes to show
 
 const CryptoPredictionChart = () => {
   const [currentTime, setCurrentTime] = useState(new Date());
-  const [selectedCrypto, setSelectedCrypto] = useState(SUPPORTED_CRYPTOS[0]);
   const [chartData, setChartData] = useState([]);
-  const [livePrice, setLivePrice] = useState(null);
+  const [prediction, setPrediction] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [zoomState, setZoomState] = useState({
-    xDomain: ['dataMin', 'dataMax'],
-    yDomain: [0, 'auto'],
-    scale: 1,
-    dragging: false
-  });
-  const [priceRange, setPriceRange] = useState(null);
-  const [mouseCoords, setMouseCoords] = useState({ x: 0, y: 0 });
+  const [nextUpdate, setNextUpdate] = useState(null);
+  const [lastFetchTime, setLastFetchTime] = useState(null);
+  const [livePrice, setLivePrice] = useState(null);
+  const [priceRange, setPriceRange] = useState({ min: 0, max: 100000, ticks: [] });
+  const [historicalPrices, setHistoricalPrices] = useState([]);
+  const [historicalPredictions, setHistoricalPredictions] = useState([]);
+
   const chartRef = useRef(null);
   const dataFetchingRef = useRef(null);
   const timeUpdateRef = useRef(null);
-
-  const cryptoPriceConfig = {
-    bitcoin: {
-      baseStep: 1000,
-      format: { minimumFractionDigits: 2, maximumFractionDigits: 2 }
-    },
-    ethereum: {
-      baseStep: 50,
-      format: { minimumFractionDigits: 2, maximumFractionDigits: 2 }
-    },
-    binancecoin: {
-      baseStep: 10,
-      format: { minimumFractionDigits: 2, maximumFractionDigits: 2 }
-    },
-    cardano: {
-      baseStep: 0.01,
-      format: { minimumFractionDigits: 4, maximumFractionDigits: 4 }
-    }
-  };
+  const priceUpdateRef = useRef(null);
 
   const theme = {
     positive: "#22c55e",
@@ -59,189 +43,248 @@ const CryptoPredictionChart = () => {
     gradientEnd: "rgba(239, 68, 68, 0.2)"
   };
 
-  useEffect(() => {
-    timeUpdateRef.current = setInterval(() => {
-      setCurrentTime(new Date());
-    }, 1000);
+  const calculatePriceRange = useCallback((prices) => {
+    if (!prices.length) {
+      return { min: 0, max: 100000, ticks: [] };
+    }
 
-    return () => {
-      if (timeUpdateRef.current) {
-        clearInterval(timeUpdateRef.current);
-      }
-    };
+    const minPrice = Math.min(...prices);
+    const maxPrice = Math.max(...prices);
+    const range = maxPrice - minPrice;
+    const padding = range * 0.1;
+
+    const min = Math.floor((minPrice - padding) / PRICE_RANGE_INTERVAL) * PRICE_RANGE_INTERVAL;
+    const max = Math.ceil((maxPrice + padding) / PRICE_RANGE_INTERVAL) * PRICE_RANGE_INTERVAL;
+    const ticks = [];
+
+    for (let price = min; price <= max; price += PRICE_RANGE_INTERVAL) {
+      ticks.push(price);
+    }
+
+    return { min, max, ticks };
   }, []);
 
-  const calculatePriceRange = useCallback((price, cryptoId) => {
-    if (!price || price <= 0) return null;
-
-    const config = cryptoPriceConfig[cryptoId] || {
-      baseStep: price * 0.01,
-      format: { minimumFractionDigits: 2, maximumFractionDigits: 6 }
-    };
-
-    const magnitude = Math.floor(Math.log10(price));
-    const baseStep = config.baseStep * Math.pow(10, Math.floor(magnitude / 3));
-
-    return {
-      min: Math.max(0, price * 0.5),
-      max: price * 1.5,
-      step: baseStep,
-      format: config.format,
-      ticks: Array.from(
-        { length: 6 },
-        (_, i) => Math.max(0, price * 0.5 + (i * (price * 0.2)))
-      )
-    };
+  const getCurrentInterval = useCallback(() => {
+    const now = new Date();
+    now.setMinutes(Math.floor(now.getMinutes() / 15) * 15, 0, 0);
+    return now;
   }, []);
 
-  const resetChartData = useCallback(() => {
-    setChartData([]);
-    setLivePrice(null);
-    setPriceRange(null);
-    setZoomState({
-      xDomain: ['dataMin', 'dataMax'],
-      yDomain: [0, 'auto'],
-      scale: 1,
-      dragging: false
+  const getNextInterval = useCallback(() => {
+    const currentInterval = getCurrentInterval();
+    return new Date(currentInterval.getTime() + 15 * 60 * 1000);
+  }, [getCurrentInterval]);
+
+  const findHistoricalData = useCallback((timestamp) => {
+    const time = new Date(timestamp);
+    const roundedTime = new Date(time);
+    roundedTime.setMinutes(Math.floor(time.getMinutes() / 15) * 15, 0, 0);
+
+    const price = historicalPrices.find(p => {
+      const pTime = new Date(p.timestamp);
+      return pTime.getTime() === roundedTime.getTime();
     });
-  }, []);
 
-  const fetchData = useCallback(async () => {
-    try {
-      const [prediction, prices] = await Promise.all([
-        fetchPrediction(selectedCrypto.id),
-        fetchLivePrice([selectedCrypto.id])
-      ]);
+    const prediction = historicalPredictions.find(p => {
+      const pTime = new Date(p.timestamp);
+      return pTime.getTime() === roundedTime.getTime();
+    });
 
-      if (!prediction || !prices[selectedCrypto.id]) {
-        throw new Error("Failed to fetch prediction or price data");
-      }
+    return { price, prediction };
+  }, [historicalPrices, historicalPredictions]);
 
-      const currentPrice = prices[selectedCrypto.id];
-      const newRange = calculatePriceRange(currentPrice, selectedCrypto.id);
+  const generatePredictionPoints = useCallback((predictionData, currentLivePrice) => {
+    const now = new Date();
+    const startTime = subHours(now, HOURS_TO_SHOW);
+    const endTime = addMinutes(now, MINUTES_TO_PREDICT);
+    const points = [];
 
-      if (!newRange) {
-        throw new Error("Failed to calculate price range");
-      }
+    startTime.setMinutes(Math.floor(startTime.getMinutes() / 15) * 15, 0, 0);
+    let currentTime = new Date(startTime);
+    const currentInterval = getCurrentInterval();
+    const nextInterval = getNextInterval();
 
-      const newDataPoint = {
+    while (currentTime <= endTime) {
+      const { price, prediction } = findHistoricalData(currentTime.getTime());
+      const isCurrentInterval = currentTime >= currentInterval && currentTime < nextInterval;
+
+      points.push({
         time: format(currentTime, TIME_FORMAT),
         timestamp: currentTime.getTime(),
-        predicted: prediction.prediction_15m,
-        actual: currentPrice,
-        sentiment: prediction.sentiment_score
-      };
-
-      setChartData(prev => {
-        const oneDayAgo = currentTime.getTime() - (24 * 60 * 60 * 1000);
-        const relevantData = prev
-          .filter(point => point.timestamp > oneDayAgo)
-          .filter(point => 
-            point.actual > newRange.min && 
-            point.actual < newRange.max
-          );
-        
-        return [...relevantData.slice(-19), newDataPoint]
-          .filter(Boolean)
-          .sort((a, b) => a.timestamp - b.timestamp);
+        predicted: isCurrentInterval ? predictionData.prediction_15m : 
+                  prediction ? prediction.value : null,
+        actual: currentTime <= now ? 
+                (price ? price.value : 
+                 isCurrentInterval ? currentLivePrice : null) : null
       });
 
-      setLivePrice(currentPrice);
-      setPriceRange(newRange);
-      setError(null);
+      currentTime = addMinutes(currentTime, 15);
+    }
 
+    return points;
+  }, [getCurrentInterval, getNextInterval, findHistoricalData]);
+
+  const updatePriceRange = useCallback(() => {
+    const allPrices = [
+      ...historicalPrices.map(p => p.value),
+      ...historicalPredictions.map(p => p.value),
+      livePrice
+    ].filter(Boolean);
+
+    setPriceRange(calculatePriceRange(allPrices));
+  }, [historicalPrices, historicalPredictions, livePrice, calculatePriceRange]);
+
+  const fetchLivePrice = useCallback(async () => {
+    try {
+      const response = await fetch(
+        'https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies=usd'
+      );
+      if (!response.ok) throw new Error('Failed to fetch live price');
+      const data = await response.json();
+      const newPrice = data.bitcoin.usd;
+      const now = getCurrentInterval();
+
+      setLivePrice(newPrice);
+      
+      setHistoricalPrices(prev => {
+        const exists = prev.find(p => p.timestamp === now.getTime());
+        if (!exists) {
+          return [...prev.filter(p => p.timestamp > subHours(now, HOURS_TO_SHOW).getTime()), 
+                  { timestamp: now.getTime(), value: newPrice }];
+        }
+        return prev;
+      });
+
+      updatePriceRange();
+      
+      if (prediction) {
+        const newChartData = generatePredictionPoints(prediction, newPrice);
+        setChartData(newChartData);
+      }
     } catch (error) {
-      console.error("Error fetching data:", error);
-      setError("Failed to fetch latest data");
+      console.error("Error fetching live price:", error);
+    }
+  }, [getCurrentInterval, generatePredictionPoints, prediction, updatePriceRange]);
+
+  const fetchData = useCallback(async () => {
+    const currentInterval = getCurrentInterval();
+    if (lastFetchTime && currentInterval.getTime() === lastFetchTime.getTime()) {
+      return;
+    }
+
+    try {
+      setLoading(true);
+      
+      await fetchLivePrice();
+      
+      const response = await fetch('http://127.0.0.1:5000/predict');
+      if (!response.ok) throw new Error('Failed to fetch prediction');
+      const data = await response.json();
+      setPrediction(data);
+
+      setHistoricalPredictions(prev => {
+        const exists = prev.find(p => p.timestamp === currentInterval.getTime());
+        if (!exists) {
+          return [...prev.filter(p => p.timestamp > subHours(currentInterval, HOURS_TO_SHOW).getTime()),
+                  { timestamp: currentInterval.getTime(), value: data.prediction_15m }];
+        }
+        return prev;
+      });
+
+      const newChartData = generatePredictionPoints(data, livePrice);
+      setChartData(newChartData);
+      setLastFetchTime(currentInterval);
+      setNextUpdate(getNextInterval());
+      setError(null);
+    } catch (error) {
+      console.error("Error fetching prediction:", error);
+      setError("Failed to fetch prediction data");
     } finally {
       setLoading(false);
     }
-  }, [selectedCrypto, calculatePriceRange, currentTime]);
+  }, [getCurrentInterval, getNextInterval, generatePredictionPoints, lastFetchTime, fetchLivePrice, livePrice]);
 
+  // Update time display and check for new interval
   useEffect(() => {
-    setLoading(true);
-    resetChartData();
+    const updateTimeDisplay = () => {
+      const now = new Date();
+      setCurrentTime(now);
 
-    if (dataFetchingRef.current) {
-      clearInterval(dataFetchingRef.current);
-    }
-
-    fetchData();
-    dataFetchingRef.current = setInterval(fetchData, 15 * 60 * 1000);
-
-    return () => {
-      if (dataFetchingRef.current) {
-        clearInterval(dataFetchingRef.current);
+      const currentInterval = getCurrentInterval();
+      if (lastFetchTime && currentInterval.getTime() !== lastFetchTime.getTime()) {
+        fetchData();
       }
     };
-  }, [selectedCrypto, resetChartData, fetchData]);
 
-  const priceTrend = useMemo(() => {
-    if (chartData.length < 2) return 0;
-    
-    const latest = chartData[chartData.length - 1].predicted;
-    const previous = chartData[chartData.length - 2].predicted;
-    
-    if (!latest || !previous || previous === 0) return 0;
-    
-    return ((latest - previous) / previous) * 100;
-  }, [chartData]);
+    timeUpdateRef.current = setInterval(updateTimeDisplay, 1000);
+    return () => clearInterval(timeUpdateRef.current);
+  }, [getCurrentInterval, lastFetchTime, fetchData]);
 
-  const handleZoom = useCallback((e) => {
-    if (!e || zoomState.dragging) return;
+  // Fetch live price periodically
+  useEffect(() => {
+    fetchLivePrice();
+    priceUpdateRef.current = setInterval(fetchLivePrice, PRICE_UPDATE_INTERVAL);
 
-    const { xDomain, yDomain } = e;
-    if (!xDomain || !yDomain) return;
+    return () => {
+      if (priceUpdateRef.current) clearInterval(priceUpdateRef.current);
+    };
+  }, [fetchLivePrice]);
 
-    setZoomState(prev => ({
-      ...prev,
-      xDomain,
-      yDomain,
-      scale: prev.scale + 1
-    }));
-  }, [zoomState.dragging]);
+  // Initial data fetch
+  useEffect(() => {
+    fetchData();
+    return () => {
+      if (dataFetchingRef.current) {
+        clearTimeout(dataFetchingRef.current);
+      }
+    };
+  }, [fetchData]);
 
-  const handleZoomOut = useCallback(() => {
-    setZoomState({
-      xDomain: ['dataMin', 'dataMax'],
-      yDomain: [0, 'auto'],
-      scale: 1,
-      dragging: false
-    });
+  // Cleanup old data
+  useEffect(() => {
+    const cleanup = () => {
+      const cutoffTime = subHours(new Date(), HOURS_TO_SHOW).getTime();
+      setHistoricalPrices(prev => prev.filter(p => p.timestamp > cutoffTime));
+      setHistoricalPredictions(prev => prev.filter(p => p.timestamp > cutoffTime));
+    };
+
+    const cleanupInterval = setInterval(cleanup, 15 * 60 * 1000);
+    return () => clearInterval(cleanupInterval);
   }, []);
 
-  const handleMouseDown = useCallback((e) => {
-    if (!e) return;
-    setZoomState(prev => ({ ...prev, dragging: true }));
-    setMouseCoords({ x: e.activeLabel, y: e.chartY });
-  }, []);
+  const renderPriceCard = useCallback(() => {
+    if (!prediction || !livePrice) return null;
 
-  const handleMouseMove = useCallback((e) => {
-    if (!e || !zoomState.dragging) return;
-    setMouseCoords({ x: e.activeLabel, y: e.chartY });
-  }, [zoomState.dragging]);
+    const priceChange = ((prediction.prediction_15m - livePrice) / livePrice) * 100;
+    const changeClass = priceChange >= 0 ? 'positive' : 'negative';
 
-  const handleMouseUp = useCallback(() => {
-    setZoomState(prev => ({ ...prev, dragging: false }));
-    if (mouseCoords.x) handleZoom();
-  }, [mouseCoords.x, handleZoom]);
-
-  const renderPriceCard = useCallback((title, value, type = "normal") => (
-    <div className="price-card">
-      <h3>{title}</h3>
-      {type === "price" ? (
+    return (
+      <div className="price-card">
+        <h3>Bitcoin (BTC)</h3>
+        <p className="current-price">
+          Live Price:
+          <br />
+          ${livePrice?.toLocaleString(undefined, {
+            minimumFractionDigits: 2,
+            maximumFractionDigits: 2
+          })}
+        </p>
         <p className="price-value">
-          ${value?.toLocaleString(undefined, priceRange?.format)}
+          Prediction until {format(nextUpdate || getNextInterval(), TIME_FORMAT)}:<br />
+          ${prediction.prediction_15m?.toLocaleString(undefined, {
+            minimumFractionDigits: 2,
+            maximumFractionDigits: 2
+          })}
+          <span className={`price-change ${changeClass}`}>
+            ({priceChange >= 0 ? '+' : ''}{priceChange.toFixed(2)}%)
+          </span>
         </p>
-      ) : type === "trend" ? (
-        <p className={`trend-value ${value >= 0 ? 'positive' : 'negative'}`}>
-          {value.toFixed(2)}%
+        <p className={`sentiment-value ${prediction.sentiment_score >= 0 ? 'positive' : 'negative'}`}>
+          Sentiment: {prediction.sentiment_score?.toFixed(2)}
         </p>
-      ) : (
-        <p className="price-value">{value}</p>
-      )}
-    </div>
-  ), [priceRange]);
+      </div>
+    );
+  }, [prediction, livePrice, nextUpdate, getNextInterval]);
 
   return (
     <motion.div
@@ -251,24 +294,15 @@ const CryptoPredictionChart = () => {
     >
       <div className="chart-header">
         <div className="crypto-info">
-          <h2>{selectedCrypto.name} Price Predictions</h2>
+          <h2>Bitcoin Price Prediction</h2>
           <div className="current-time">
             {format(currentTime, DATE_TIME_FORMAT)} UTC
           </div>
-        
-        </div>
-        <div className="crypto-selector">
-          {SUPPORTED_CRYPTOS.map((crypto) => (
-            <motion.button
-              key={crypto.id}
-              whileHover={{ scale: 1.05 }}
-              whileTap={{ scale: 0.95 }}
-              className={`crypto-button ${crypto.id === selectedCrypto.id ? 'active' : ''}`}
-              onClick={() => setSelectedCrypto(crypto)}
-            >
-              {crypto.symbol}
-            </motion.button>
-          ))}
+          {nextUpdate && (
+            <div className="next-update">
+              Next Prediction: {format(nextUpdate, TIME_FORMAT)} UTC
+            </div>
+          )}
         </div>
       </div>
 
@@ -289,27 +323,13 @@ const CryptoPredictionChart = () => {
             exit={{ opacity: 0, y: -20 }}
           >
             <div className="price-cards">
-              {renderPriceCard("Live Price", livePrice, "price")}
-              {renderPriceCard("Trend", priceTrend, "trend")}
-              <div className="price-card">
-                <h3>Zoom Level</h3>
-                <button 
-                  className="zoom-button"
-                  onClick={handleZoomOut}
-                  disabled={zoomState.scale === 1}
-                >
-                  Reset Zoom
-                </button>
-              </div>
+              {renderPriceCard()}
             </div>
 
             <div className="chart-wrapper">
               <ResponsiveContainer width="100%" height={400}>
                 <LineChart
                   data={chartData}
-                  onMouseDown={handleMouseDown}
-                  onMouseMove={handleMouseMove}
-                  onMouseUp={handleMouseUp}
                   ref={chartRef}
                 >
                   <defs>
@@ -328,17 +348,15 @@ const CryptoPredictionChart = () => {
                   <XAxis
                     dataKey="time"
                     stroke={theme.text}
-                    domain={zoomState.xDomain}
-                    tickFormatter={time => time}
+                    interval={0}
+                    minTickGap={50}
                   />
                   
                   <YAxis
                     stroke={theme.text}
-                    domain={priceRange ? [priceRange.min, priceRange.max] : [0, 'auto']}
-                    tickFormatter={(value) => 
-                      `$${value.toLocaleString(undefined, priceRange?.format)}`
-                    }
-                    ticks={priceRange?.ticks}
+                    domain={[priceRange.min, priceRange.max]}
+                    ticks={priceRange.ticks}
+                    tickFormatter={(value) => `$${value.toLocaleString()}`}
                   />
                   
                   <Tooltip
@@ -349,40 +367,31 @@ const CryptoPredictionChart = () => {
                     labelStyle={{ color: theme.text }}
                     labelFormatter={(time) => `Time: ${time} UTC`}
                     formatter={(value, name) => [
-                      `$${value.toLocaleString(undefined, priceRange?.format)}`,
+                      `$${value?.toLocaleString()}`,
                       name
                     ]}
                   />
                   
                   <Legend />
 
-                  {zoomState.dragging && (
-                    <ReferenceArea
-                      x1={mouseCoords.x}
-                      x2={mouseCoords.x}
-                      strokeOpacity={0.3}
-                      fill={theme.gradientStart}
-                    />
-                  )}
-
                   <Line
-                    type="monotone"
+                    type="stepAfter"
                     dataKey="predicted"
                     stroke={theme.positive}
                     strokeWidth={2}
-                    dot={{ r: 4 }}
-                    name="Predicted Price"
+                    dot={false}
+                    name="BTC Prediction"
                     fill="url(#predicted)"
                     isAnimationActive={false}
                   />
-                  
+
                   <Line
                     type="monotone"
                     dataKey="actual"
                     stroke={theme.negative}
                     strokeWidth={2}
-                    dot={{ r: 4 }}
-                    name="Actual Price"
+                    dot={false}
+                    name="BTC Live Price"
                     fill="url(#actual)"
                     isAnimationActive={false}
                   />
