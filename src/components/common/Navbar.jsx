@@ -56,7 +56,9 @@ const Navbar = () => {
   const navItems = [
     { path: '/', name: 'Home' },
     { path: '/about', name: 'About' },
-    { path: '/contact', name: 'Contact' }
+    { path: '/contact', name: 'Contact' },
+    { path: '/history', name: 'History' }
+
   ];
 
   const currentTime = new Date().toLocaleString('en-US', {

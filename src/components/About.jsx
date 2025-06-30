@@ -7,9 +7,9 @@ const About = () => {
     { name: 'React.js', icon: '⚛️', description: 'Modern UI Development', details: 'Building responsive and interactive user interfaces' },
     { name: 'TensorFlow', icon: '🧠', description: 'AI/ML Engine', details: 'Powering advanced price prediction algorithms' },
     { name: 'Node.js', icon: '🟢', description: 'Backend Runtime', details: 'High-performance server-side operations' },
-    { name: 'WebSocket', icon: '🔄', description: 'Real-time Data', details: 'Millisecond latency market updates' },
-    { name: 'AWS', icon: '☁️', description: 'Cloud Platform', details: 'Scalable and reliable infrastructure' },
-    { name: 'MongoDB', icon: '🍃', description: 'Database', details: 'Fast and flexible data storage' }
+    { name: 'Google News Api', icon: '🔄', description: 'Real-time News', details: 'Millisecond latency market updates' },
+    { name: 'Render', icon: '☁️', description: 'Cloud Platform', details: 'Scalable and reliable infrastructure' },
+    { name: 'Firebase', icon: '🍃', description: 'Database', details: 'Fast and flexible data storage' }
   ];
 
   const statistics = [
@@ -17,36 +17,6 @@ const About = () => {
     { number: '<50ms', label: 'Latency', icon: '⚡' },
     { number: '50M+', label: 'Predictions', icon: '📊' },
     { number: '100K+', label: 'Active Users', icon: '👥' }
-  ];
-
-  const features = [
-    {
-      title: 'Advanced Analytics',
-      items: [
-        'Real-time price tracking with millisecond updates',
-        'Machine learning-powered price predictions',
-        'Advanced technical analysis indicators',
-        'Sentiment analysis from multiple sources'
-      ]
-    },
-    {
-      title: 'Trading Tools',
-      items: [
-        'Customizable trading dashboard',
-        'Multiple timeframe analysis',
-        'Risk management calculator',
-        'Portfolio tracking and analysis'
-      ]
-    },
-    {
-      title: 'Security & Reliability',
-      items: [
-        'Enterprise-grade security measures',
-        'Multi-factor authentication',
-        'Encrypted data transmission',
-        'Automated backup systems'
-      ]
-    }
   ];
 
   const missionStatement = {
@@ -89,7 +59,6 @@ const About = () => {
         <div className="hero-content">
           <h1>About CryptoPredict</h1>
           <p className="hero-subtitle">Next-Generation Cryptocurrency Analytics Platform</p>
-        
         </div>
       </motion.div>
 
@@ -140,38 +109,11 @@ const About = () => {
           </div>
         </motion.section>
 
-        <motion.section className="features-section" variants={itemVariants}>
-          <h2>Platform Features</h2>
-          <div className="features-grid">
-            {features.map((category, index) => (
-              <motion.div 
-                key={index}
-                className="feature-category"
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: index * 0.2 }}
-              >
-                <h3>{category.title}</h3>
-                <ul>
-                  {category.items.map((item, i) => (
-                    <motion.li 
-                      key={i}
-                      whileHover={{ x: 10 }}
-                    >
-                      {item}
-                    </motion.li>
-                  ))}
-                </ul>
-              </motion.div>
-            ))}
-          </div>
-        </motion.section>
-
         <motion.section className="contact-section" variants={itemVariants}>
           <h2>Connect With Us</h2>
           <div className="contact-grid">
             <motion.a 
-              href="https://github.com/toshankanwar"
+              href="https://github.com/cryptopredict"
               target="_blank"
               rel="noopener noreferrer"
               className="contact-card github"
@@ -202,7 +144,6 @@ const About = () => {
               <p>Read our comprehensive guides</p>
             </motion.div>
           </div>
-          
         </motion.section>
       </motion.div>
     </div>

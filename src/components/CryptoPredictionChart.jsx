@@ -6,16 +6,34 @@ import {
 import { motion, AnimatePresence } from "framer-motion";
 import "./CryptoPredictionChart.css";
 import { format, setMinutes, setSeconds, addMinutes, subHours } from 'date-fns';
+import SentimentAnalysis from "./SentimentAnalysis";
+
+// FIREBASE IMPORTS
+import { db } from "./firebaseConfig";
+import { collection, addDoc, query, where, orderBy, getDocs, limit } from "firebase/firestore";
+
+const SUPPORTED_CRYPTOS = [
+  { id: "bitcoin", symbol: "BTC", name: "Bitcoin" },
+  { id: "ethereum", symbol: "ETH", name: "Ethereum" },
+  { id: "binancecoin", symbol: "BNB", name: "Binance Coin" },
+  { id: "cardano", symbol: "ADA", name: "Cardano" },
+  { id: "solana", symbol: "SOL", name: "Solana" },
+  { id: "ripple", symbol: "XRP", name: "Ripple" },
+  { id: "polkadot", symbol: "DOT", name: "Polkadot" },
+  { id: "dogecoin", symbol: "DOGE", name: "Dogecoin" },
+  { id: "avalanche-2", symbol: "AVAX", name: "Avalanche" },
+  { id: "matic-network", symbol: "MATIC", name: "Polygon" },
+];
 
 const TIME_FORMAT = 'HH:mm';
 const DATE_TIME_FORMAT = 'yyyy-MM-dd HH:mm:ss';
-const PRICE_UPDATE_INTERVAL = 60 * 1000; // 1 minute in milliseconds
-const PRICE_RANGE_INTERVAL = 1000; // $1,000 intervals
-const PRICE_RANGE_PADDING = 5000; // $5,000 padding above and below
-const HOURS_TO_SHOW = 4; // Past hours to show
-const MINUTES_TO_PREDICT = 30; // Future minutes to show
+const PRICE_UPDATE_INTERVAL = 60 * 1000;
+const PRICE_RANGE_INTERVAL = 1000;
+const HOURS_TO_SHOW = 4;
+const MINUTES_TO_PREDICT = 30;
 
 const CryptoPredictionChart = () => {
+  const [selectedCrypto, setSelectedCrypto] = useState(SUPPORTED_CRYPTOS[0]);
   const [currentTime, setCurrentTime] = useState(new Date());
   const [chartData, setChartData] = useState([]);
   const [prediction, setPrediction] = useState(null);
@@ -47,20 +65,16 @@ const CryptoPredictionChart = () => {
     if (!prices.length) {
       return { min: 0, max: 100000, ticks: [] };
     }
-
     const minPrice = Math.min(...prices);
     const maxPrice = Math.max(...prices);
     const range = maxPrice - minPrice;
     const padding = range * 0.1;
-
     const min = Math.floor((minPrice - padding) / PRICE_RANGE_INTERVAL) * PRICE_RANGE_INTERVAL;
     const max = Math.ceil((maxPrice + padding) / PRICE_RANGE_INTERVAL) * PRICE_RANGE_INTERVAL;
     const ticks = [];
-
     for (let price = min; price <= max; price += PRICE_RANGE_INTERVAL) {
       ticks.push(price);
     }
-
     return { min, max, ticks };
   }, []);
 
@@ -74,6 +88,37 @@ const CryptoPredictionChart = () => {
     const currentInterval = getCurrentInterval();
     return new Date(currentInterval.getTime() + 15 * 60 * 1000);
   }, [getCurrentInterval]);
+
+  // FETCH HISTORICAL PREDICTIONS FROM FIREBASE
+  const fetchPredictionsFromDB = useCallback(async () => {
+    try {
+      // Get last 100 predictions for this crypto
+      const q = query(
+        collection(db, "predictions"),
+        where("crypto_id", "==", selectedCrypto.id),
+        orderBy("prediction_time", "desc"),
+        limit(100)
+      );
+      const snapshot = await getDocs(q);
+      const pred = [];
+      const prices = [];
+      snapshot.forEach((doc) => {
+        const d = doc.data();
+        // For charting, both real and predicted
+        pred.push({ timestamp: new Date(d.prediction_time).getTime(), value: d.predicted_price });
+        prices.push({ timestamp: new Date(d.prediction_time).getTime(), value: d.real_time_price });
+      });
+      setHistoricalPredictions(pred);
+      setHistoricalPrices(prices);
+    } catch (err) {
+      console.error("Error fetching historical predictions from DB:", err);
+    }
+  }, [selectedCrypto.id]);
+
+  // Only fetch historical from DB on load/change
+  useEffect(() => {
+    fetchPredictionsFromDB();
+  }, [fetchPredictionsFromDB, selectedCrypto]);
 
   const findHistoricalData = useCallback((timestamp) => {
     const time = new Date(timestamp);
@@ -98,7 +143,6 @@ const CryptoPredictionChart = () => {
     const startTime = subHours(now, HOURS_TO_SHOW);
     const endTime = addMinutes(now, MINUTES_TO_PREDICT);
     const points = [];
-
     startTime.setMinutes(Math.floor(startTime.getMinutes() / 15) * 15, 0, 0);
     let currentTime = new Date(startTime);
     const currentInterval = getCurrentInterval();
@@ -107,20 +151,17 @@ const CryptoPredictionChart = () => {
     while (currentTime <= endTime) {
       const { price, prediction } = findHistoricalData(currentTime.getTime());
       const isCurrentInterval = currentTime >= currentInterval && currentTime < nextInterval;
-
       points.push({
         time: format(currentTime, TIME_FORMAT),
         timestamp: currentTime.getTime(),
-        predicted: isCurrentInterval ? predictionData.prediction_15m : 
+        predicted: isCurrentInterval ? predictionData?.prediction_15m : 
                   prediction ? prediction.value : null,
         actual: currentTime <= now ? 
                 (price ? price.value : 
                  isCurrentInterval ? currentLivePrice : null) : null
       });
-
       currentTime = addMinutes(currentTime, 15);
     }
-
     return points;
   }, [getCurrentInterval, getNextInterval, findHistoricalData]);
 
@@ -130,22 +171,21 @@ const CryptoPredictionChart = () => {
       ...historicalPredictions.map(p => p.value),
       livePrice
     ].filter(Boolean);
-
     setPriceRange(calculatePriceRange(allPrices));
   }, [historicalPrices, historicalPredictions, livePrice, calculatePriceRange]);
 
+  // Fetch live price for selected crypto
   const fetchLivePrice = useCallback(async () => {
     try {
       const response = await fetch(
-        'https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies=usd'
+        `https://api.coingecko.com/api/v3/simple/price?ids=${selectedCrypto.id}&vs_currencies=usd`
       );
       if (!response.ok) throw new Error('Failed to fetch live price');
       const data = await response.json();
-      const newPrice = data.bitcoin.usd;
+      const newPrice = data[selectedCrypto.id]?.usd;
       const now = getCurrentInterval();
 
       setLivePrice(newPrice);
-      
       setHistoricalPrices(prev => {
         const exists = prev.find(p => p.timestamp === now.getTime());
         if (!exists) {
@@ -156,7 +196,6 @@ const CryptoPredictionChart = () => {
       });
 
       updatePriceRange();
-      
       if (prediction) {
         const newChartData = generatePredictionPoints(prediction, newPrice);
         setChartData(newChartData);
@@ -164,8 +203,30 @@ const CryptoPredictionChart = () => {
     } catch (error) {
       console.error("Error fetching live price:", error);
     }
-  }, [getCurrentInterval, generatePredictionPoints, prediction, updatePriceRange]);
+  }, [getCurrentInterval, generatePredictionPoints, prediction, updatePriceRange, selectedCrypto, HOURS_TO_SHOW]);
 
+  // --- STORE PREDICTION TO FIREBASE & FETCH ---
+  const storePredictionToDB = useCallback(async (data, livePrice, nextUpdateVal) => {
+    try {
+      const predictionTime = new Date();
+      await addDoc(collection(db, "predictions"), {
+        crypto_id: selectedCrypto.id,
+        symbol: selectedCrypto.symbol,
+        name: selectedCrypto.name,
+        sentiment_score: data.sentiment_score,
+        prediction_time: predictionTime.toISOString(),
+        predicted_for_time: format(nextUpdateVal, DATE_TIME_FORMAT),
+        real_time_price: livePrice,
+        predicted_price: data.prediction_15m,
+      });
+      // After storing, refresh local predictions from DB
+      fetchPredictionsFromDB();
+    } catch (dbErr) {
+      console.error("Failed to save prediction to Firestore:", dbErr);
+    }
+  }, [selectedCrypto, fetchPredictionsFromDB]);
+
+  // Fetch prediction data for selected crypto
   const fetchData = useCallback(async () => {
     const currentInterval = getCurrentInterval();
     if (lastFetchTime && currentInterval.getTime() === lastFetchTime.getTime()) {
@@ -174,10 +235,8 @@ const CryptoPredictionChart = () => {
 
     try {
       setLoading(true);
-      
       await fetchLivePrice();
-      
-      const response = await fetch('http://127.0.0.1:5000/predict');
+      const response = await fetch(`http://127.0.0.1:5000/predict/${selectedCrypto.id}`);
       if (!response.ok) throw new Error('Failed to fetch prediction');
       const data = await response.json();
       setPrediction(data);
@@ -196,13 +255,21 @@ const CryptoPredictionChart = () => {
       setLastFetchTime(currentInterval);
       setNextUpdate(getNextInterval());
       setError(null);
+
+      // Store to Firestore
+      await storePredictionToDB(
+        data,
+        livePrice,
+        getNextInterval()
+      );
+
     } catch (error) {
       console.error("Error fetching prediction:", error);
       setError("Failed to fetch prediction data");
     } finally {
       setLoading(false);
     }
-  }, [getCurrentInterval, getNextInterval, generatePredictionPoints, lastFetchTime, fetchLivePrice, livePrice]);
+  }, [getCurrentInterval, getNextInterval, generatePredictionPoints, lastFetchTime, fetchLivePrice, livePrice, selectedCrypto, HOURS_TO_SHOW, storePredictionToDB]);
 
   // Update time display and check for new interval
   useEffect(() => {
@@ -252,6 +319,20 @@ const CryptoPredictionChart = () => {
     return () => clearInterval(cleanupInterval);
   }, []);
 
+  // When switching cryptos, reset relevant state
+  useEffect(() => {
+    setChartData([]);
+    setPrediction(null);
+    setLoading(true);
+    setError(null);
+    setNextUpdate(null);
+    setLastFetchTime(null);
+    setLivePrice(null);
+    setHistoricalPrices([]);
+    setHistoricalPredictions([]);
+    fetchPredictionsFromDB();
+  }, [selectedCrypto, fetchPredictionsFromDB]);
+
   const renderPriceCard = useCallback(() => {
     if (!prediction || !livePrice) return null;
 
@@ -260,7 +341,7 @@ const CryptoPredictionChart = () => {
 
     return (
       <div className="price-card">
-        <h3>Bitcoin (BTC)</h3>
+        <h3>{selectedCrypto.name} ({selectedCrypto.symbol})</h3>
         <p className="current-price">
           Live Price:
           <br />
@@ -284,7 +365,7 @@ const CryptoPredictionChart = () => {
         </p>
       </div>
     );
-  }, [prediction, livePrice, nextUpdate, getNextInterval]);
+  }, [prediction, livePrice, nextUpdate, getNextInterval, selectedCrypto]);
 
   return (
     <motion.div
@@ -294,7 +375,7 @@ const CryptoPredictionChart = () => {
     >
       <div className="chart-header">
         <div className="crypto-info">
-          <h2>Bitcoin Price Prediction</h2>
+          <h2>{selectedCrypto.name} Price Prediction</h2>
           <div className="current-time">
             {format(currentTime, DATE_TIME_FORMAT)} UTC
           </div>
@@ -303,6 +384,23 @@ const CryptoPredictionChart = () => {
               Next Prediction: {format(nextUpdate, TIME_FORMAT)} UTC
             </div>
           )}
+        </div>
+        <div className="crypto-switcher">
+          <label htmlFor="crypto-select">Select Coin:</label>
+          <select
+            id="crypto-select"
+            value={selectedCrypto.id}
+            onChange={e => {
+              const newCrypto = SUPPORTED_CRYPTOS.find(c => c.id === e.target.value);
+              setSelectedCrypto(newCrypto);
+            }}
+          >
+            {SUPPORTED_CRYPTOS.map(crypto => (
+              <option key={crypto.id} value={crypto.id}>
+                {crypto.name} ({crypto.symbol})
+              </option>
+            ))}
+          </select>
         </div>
       </div>
 
@@ -380,7 +478,7 @@ const CryptoPredictionChart = () => {
                     stroke={theme.positive}
                     strokeWidth={2}
                     dot={false}
-                    name="BTC Prediction"
+                    name={`${selectedCrypto.symbol} Prediction`}
                     fill="url(#predicted)"
                     isAnimationActive={false}
                   />
@@ -391,12 +489,21 @@ const CryptoPredictionChart = () => {
                     stroke={theme.negative}
                     strokeWidth={2}
                     dot={false}
-                    name="BTC Live Price"
+                    name={`${selectedCrypto.symbol} Live Price`}
                     fill="url(#actual)"
                     isAnimationActive={false}
                   />
                 </LineChart>
               </ResponsiveContainer>
+            </div>
+
+            {/* Market Sentiment Analysis Card */}
+            <div style={{ marginTop: 32 }}>
+              <SentimentAnalysis
+                score={prediction?.sentiment_score ?? null}
+                symbol={selectedCrypto.symbol}
+                cryptoName={selectedCrypto.name}
+              />
             </div>
           </motion.div>
         ) : (

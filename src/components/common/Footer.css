@@ -106,3 +106,144 @@
       text-align: center;
     }
   }/* Add these styles to your Footer.css */
+
+
+  /* Footer.css */
+
+.pro-footer {
+  background: linear-gradient(135deg, #181c23 70%, #23272f 100%);
+  color: #e5e7eb;
+  padding: 0 0 0.5rem 0;
+  border-top: 1px solid #22292f;
+  font-family: 'Inter', sans-serif;
+  box-shadow: 0 -2px 24px 0 rgba(34,197,94,0.06);
+}
+
+.footer-main-grid {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 3rem;
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 2.5rem 2rem 1.5rem 2rem;
+}
+
+.footer-brand {
+  flex: 1 1 230px;
+}
+
+.footer-logo {
+  font-size: 2rem;
+  font-weight: 700;
+  margin-bottom: 0.3rem;
+}
+
+.footer-logo-gradient {
+  background: linear-gradient(92deg, #22c55e 0%, #3b82f6 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.footer-tagline {
+  font-size: 1.06rem;
+  margin-top: 0.2rem;
+  color: #a3a3a3;
+  font-weight: 500;
+}
+
+.footer-ai {
+  color: #22c55e;
+  font-weight: bold;
+}
+
+.footer-nav {
+  flex: 1 1 160px;
+}
+
+.footer-link-list {
+  list-style: none;
+  padding: 0;
+  margin: 0.6rem 0 0 0;
+}
+
+.footer-link {
+  display: block;
+  color: #e5e7eb;
+  text-decoration: none;
+  padding: 0.2rem 0;
+  font-size: 1.05rem;
+  font-weight: 500;
+  transition: color 0.2s;
+}
+
+.footer-link.active {
+  color: #22c55e;
+}
+
+.footer-social {
+  flex: 1 1 210px;
+}
+
+.footer-social-list {
+  display: flex;
+  gap: 1.2rem;
+  margin-top: 0.8rem;
+}
+
+.footer-social-icon-link {
+  display: flex;
+  align-items: center;
+  color: #cbd5e1;
+  border-radius: 50%;
+  padding: 0.35rem;
+  font-size: 1.18rem;
+  background: transparent;
+  transition: background 0.2s, color 0.2s;
+  text-decoration: none;
+  position: relative;
+}
+
+.footer-social-icon-link:hover,
+.footer-social-icon-link:focus {
+  color: #22c55e;
+  background: rgba(34,197,94,0.10);
+}
+
+.footer-social-label {
+  display: none;
+  margin-left: 0.5rem;
+  font-size: 0.98rem;
+  font-weight: 600;
+}
+
+@media (min-width: 900px) {
+  .footer-social-label {
+    display: inline;
+  }
+}
+
+.footer-bottom-pro {
+  text-align: center;
+  border-top: 1px solid #22292f;
+  padding: 0.75rem 2rem 0.5rem 2rem;
+  font-size: 1.02rem;
+  color: #a3a3a3;
+  background: none;
+  margin-top: 0.7rem;
+}
+
+.creator-link-pro {
+  display: inline-block;
+  margin-left: 0.7rem;
+  color: #a3a3a3;
+  text-decoration: none;
+  font-weight: 500;
+  font-size: 1.03rem;
+  transition: color 0.2s;
+}
+
+.creator-link-pro:hover {
+  color: #22c55e;
+}

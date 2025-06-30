@@ -1,7 +1,8 @@
 import React from "react";
 import { motion } from "framer-motion";
 
-const SentimentAnalysis = ({ score, symbol }) => {
+// Accepts score and symbol (e.g., BTC, ETH, etc.) and cryptoName for clarity
+const SentimentAnalysis = ({ score, symbol, cryptoName }) => {
   const getSentimentColor = (score) => {
     if (score > 0.3) return "#22c55e";
     if (score < -0.3) return "#ef4444";
@@ -26,7 +27,9 @@ const SentimentAnalysis = ({ score, symbol }) => {
         boxShadow: "0 4px 6px rgba(0, 0, 0, 0.1)",
       }}
     >
-      <h3 style={{ marginBottom: "1rem" }}>{symbol} Market Sentiment</h3>
+      <h3 style={{ marginBottom: "1rem" }}>
+        {cryptoName ? `${cryptoName} (${symbol})` : symbol} Market Sentiment
+      </h3>
       <div style={{ display: "flex", alignItems: "center", gap: "1.5rem" }}>
         <motion.div
           style={{

@@ -1,6 +1,5 @@
 import React from "react";
 import CryptoPredictionChart from "./CryptoPredictionChart";
-import SentimentAnalysis from "./SentimentAnalysis";
 import { motion } from "framer-motion";
 import "./CryptoDashboard.css";
 
@@ -31,10 +30,7 @@ const CryptoDashboard = () => {
             <CryptoPredictionChart />
           </div>
           
-          <div className="widgets-grid">
-            {/* Add more components here as needed */}
-            <SentimentAnalysis />
-          </div>
+        
         </motion.div>
       </div>
     </motion.div>

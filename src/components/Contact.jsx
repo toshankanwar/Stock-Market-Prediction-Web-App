@@ -78,42 +78,15 @@ const Contact = () => {
     },
     {
       title: 'Location',
-      value: 'New York, NY',
+      value: 'IIIT Naya Raipur Chhattisgarh',
       icon: '📍',
-      link: null
+      link: "https://maps.app.goo.gl/bgpvozj3eyEJACqq6"
     },
     {
       title: 'Working Hours',
       value: '24/7 Support',
       icon: '⏰',
       link: null
-    }
-  ];
-
-  const socialLinks = [
-    {
-      name: 'GitHub',
-      icon: 'fab fa-github',
-      url: 'https://github.com/toshankanwar',
-      color: '#333'
-    },
-    {
-      name: 'LinkedIn',
-      icon: 'fab fa-linkedin',
-      url: 'https://linkedin.com/in/toshankanwar',
-      color: '#0077b5'
-    },
-    {
-      name: 'Twitter',
-      icon: 'fab fa-twitter',
-      url: 'https://twitter.com/toshankanwar',
-      color: '#1da1f2'
-    },
-    {
-      name: 'Discord',
-      icon: 'fab fa-discord',
-      url: 'https://discord.gg/cryptopredict',
-      color: '#7289da'
     }
   ];
 
@@ -129,42 +102,16 @@ const Contact = () => {
           <div className="hero-content">
             <h1>Get in Touch</h1>
             <p className="hero-subtitle">Have questions? We would love to hear from you.</p>
-            <div className="hero-meta">
-            </div>
           </div>
         </motion.div>
 
         <div className="contact-content">
-          <motion.div 
-            className="contact-info-grid"
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.2 }}
-          >
-            {contactInfo.map((info, index) => (
-              <motion.div 
-                key={info.title}
-                className="contact-info-card"
-                whileHover={{ scale: 1.05 }}
-                whileTap={{ scale: 0.95 }}
-              >
-                <span className="info-icon">{info.icon}</span>
-                <h3>{info.title}</h3>
-                {info.link ? (
-                  <a href={info.link}>{info.value}</a>
-                ) : (
-                  <p>{info.value}</p>
-                )}
-              </motion.div>
-            ))}
-          </motion.div>
-
           <div className="contact-main">
             <motion.div 
               className="contact-form-container"
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.4 }}
+              transition={{ delay: 0.2 }}
             >
               <h2>Send us a Message</h2>
               <form onSubmit={handleSubmit} className="contact-form">
@@ -229,33 +176,30 @@ const Contact = () => {
             </motion.div>
 
             <motion.div 
-              className="social-links"
+              className="contact-info-grid"
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.6 }}
+              transition={{ delay: 0.4 }}
             >
-              <h2>Connect With Us</h2>
-              <div className="social-grid">
-                {socialLinks.map((social, index) => (
-                  <motion.a
-                    key={social.name}
-                    href={social.url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="social-card"
-                    whileHover={{ scale: 1.05, y: -5 }}
-                    whileTap={{ scale: 0.95 }}
-                  >
-                    <i className={social.icon}></i>
-                    <span>{social.name}</span>
-                  </motion.a>
-                ))}
-              </div>
+              {contactInfo.map((info, index) => (
+                <motion.div 
+                  key={info.title}
+                  className="contact-info-card"
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.95 }}
+                >
+                  <span className="info-icon">{info.icon}</span>
+                  <h3>{info.title}</h3>
+                  {info.link ? (
+                    <a href={info.link}>{info.value}</a>
+                  ) : (
+                    <p>{info.value}</p>
+                  )}
+                </motion.div>
+              ))}
             </motion.div>
           </div>
         </div>
-
-      
       </div>
     </div>
   );
